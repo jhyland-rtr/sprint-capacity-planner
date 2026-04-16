@@ -157,7 +157,7 @@
                                                 onSub={() => adjust(setDevs, devs, -1)} 
                                             />
                                             <CounterInput 
-                                                label="Avg. Full Team Velocity" 
+                                                label="Avg. Full Team Velocity (Story Points)" 
                                                 value={velocity} 
                                                 onAdd={() => adjust(setVelocity, velocity, 1)} 
                                                 onSub={() => adjust(setVelocity, velocity, -1)} 
@@ -208,10 +208,27 @@
             );
         }
 
+        // Updated component to handle subtle unit labels
         function CounterInput({ label, value, onAdd, onSub }) {
+            // Function to split the label if it contains parentheses
+            const renderLabel = () => {
+                const parts = label.split('(');
+                if (parts.length > 1) {
+                    return (
+                        <Typography sx={{ fontWeight: 500, color: '#334155' }}>
+                            {parts[0].trim()} 
+                            <Box component="span" sx={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.8rem', ml: 0.5 }}>
+                                ({parts[1]}
+                            </Box>
+                        </Typography>
+                    );
+                }
+                return <Typography sx={{ fontWeight: 500, color: '#334155' }}>{label}</Typography>;
+            };
+
             return (
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography sx={{ fontWeight: 500, color: '#334155' }}>{label}</Typography>
+                    {renderLabel()}
                     <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: '#f1f5f9', borderRadius: 2, p: 0.5 }}>
                         <IconButton onClick={onSub} size="small" sx={{ color: '#64748b' }}><Icon>remove</Icon></IconButton>
                         <Typography sx={{ width: 40, textAlign: 'center', fontWeight: 700, fontSize: '1.1rem' }}>{value}</Typography>
@@ -225,7 +242,9 @@
             return (
                 <Box sx={{ mb: 3 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{label} <span style={{fontWeight: 400, color: '#94a3b8'}}>({pct})</span></Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {label} <Box component="span" sx={{ fontWeight: 400, color: '#94a3b8' }}>({pct})</Box>
+                        </Typography>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{val}</Typography>
                     </Box>
                     <LinearProgress 
