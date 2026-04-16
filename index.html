@@ -82,10 +82,26 @@
         });
 
         function App() {
-            const [sprintWeeks, setSprintWeeks] = React.useState(2);
-            const [devs, setDevs] = React.useState(6);
-            const [velocity, setVelocity] = React.useState(25);
-            const [leave, setLeave] = React.useState(0);
+            // Read URL Params
+            const params = new URLSearchParams(window.location.search);
+            
+            const [sprintWeeks, setSprintWeeks] = React.useState(Number(params.get('sprintDuration')) || 0);
+            const [devs, setDevs] = React.useState(Number(params.get('teamSize')) || 0);
+            const [velocity, setVelocity] = React.useState(Number(params.get('teamVelocity')) || 0);
+            const [leave, setLeave] = React.useState(Number(params.get('developerLeave')) || 0);
+
+            // Parse Allocations string
+            const rawAlloc = params.get('allocations');
+            const allocations = React.useMemo(() => {
+                if (!rawAlloc) return [];
+                return rawAlloc.split(',').map(item => {
+                    const parts = item.split(':');
+                    return { 
+                        label: parts[0]?.trim() || "Unlabeled", 
+                        percent: Number(parts[1]) / 100 || 0 
+                    };
+                });
+            }, [rawAlloc]);
 
             // Calculation Logic
             const WORKING_DAYS_PER_WEEK = 5;
@@ -96,28 +112,32 @@
             const capacityFactor = totalPotentialDays > 0 ? actualDays / totalPotentialDays : 0;
             const totalCapacity = Math.round(velocity * capacityFactor);
             
-            // Apportionment Logic (Largest Remainder Method)
-            const calculateApportionment = (total, ratios) => {
-                if (total === 0) return ratios.map(() => 0);
-                let items = ratios.map((ratio, index) => {
-                    const exact = total * ratio;
+            // Apportionment (Largest Remainder Method)
+            const calculateApportionment = (total, buckets) => {
+                if (total === 0 || buckets.length === 0) return buckets.map(() => 0);
+                
+                let items = buckets.map((b, index) => {
+                    const exact = total * b.percent;
                     return {
                         index,
                         floor: Math.floor(exact),
                         remainder: exact - Math.floor(exact)
                     };
                 });
+                
                 let currentSum = items.reduce((sum, item) => sum + item.floor, 0);
                 let missing = total - currentSum;
+                
                 items.sort((a, b) => b.remainder - a.remainder || a.index - b.index);
                 for (let i = 0; i < missing; i++) {
                     items[i].floor++;
                 }
+                
                 items.sort((a, b) => a.index - b.index);
                 return items.map(item => item.floor);
             };
 
-            const [productPoints, techPoints, bauPoints] = calculateApportionment(totalCapacity, [0.70, 0.20, 0.10]);
+            const calculatedAllocations = calculateApportionment(totalCapacity, allocations);
 
             const adjust = (setter, current, amount) => {
                 setter(Math.max(0, current + amount));
@@ -134,11 +154,9 @@
                         </Box>
 
                         <Grid container spacing={4}>
-                            {/* Input Column */}
                             <Grid item xs={12} md={6}>
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                     
-                                    {/* Group 1: Regular Parameters */}
                                     <div className="section-box">
                                         <div className="section-header-container">
                                             <Typography className="section-header-text">Regular Sprint Parameters</Typography>
@@ -157,7 +175,7 @@
                                                 onSub={() => adjust(setDevs, devs, -1)} 
                                             />
                                             <CounterInput 
-                                                label="Avg. Full Team Velocity (Story Points)" 
+                                                label="Avg. Full Team Velocity (Points)" 
                                                 value={velocity} 
                                                 onAdd={() => adjust(setVelocity, velocity, 1)} 
                                                 onSub={() => adjust(setVelocity, velocity, -1)} 
@@ -165,7 +183,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Group 2: Upcoming Sprint Variable */}
                                     <div className="section-box">
                                         <div className="section-header-container">
                                             <Typography className="section-header-text">Upcoming Sprint</Typography>
@@ -182,7 +199,6 @@
                                 </Box>
                             </Grid>
 
-                            {/* Results Column */}
                             <Grid item xs={12} md={6}>
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                                     <div className="capacity-card">
@@ -193,13 +209,22 @@
                                         <Typography variant="h6" color="textSecondary">Story Points</Typography>
                                     </div>
 
-                                    <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid #e2e8f0' }}>
-                                        <Typography variant="h6" sx={{ mb: 3, fontWeight: 700 }}>Allocation Breakdown</Typography>
-                                        
-                                        <StatBar label="Product Features" pct="70%" val={productPoints} color="#1976d2" barVal={70} />
-                                        <StatBar label="Tech Advancement" pct="20%" val={techPoints} color="#ed6c02" barVal={20} />
-                                        <StatBar label="BAU / Support" pct="10%" val={bauPoints} color="#10b981" barVal={10} />
-                                    </Paper>
+                                    {allocations.length > 0 && (
+                                        <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid #e2e8f0' }}>
+                                            <Typography variant="h6" sx={{ mb: 3, fontWeight: 700 }}>Allocation Breakdown</Typography>
+                                            
+                                            {allocations.map((alloc, i) => (
+                                                <StatBar 
+                                                    key={i}
+                                                    label={alloc.label} 
+                                                    pct={`${alloc.percent * 100}%`} 
+                                                    val={calculatedAllocations[i]} 
+                                                    color={i === 0 ? "#1976d2" : i === 1 ? "#ed6c02" : i === 2 ? "#10b981" : "#64748b"} 
+                                                    barVal={alloc.percent * 100} 
+                                                />
+                                            ))}
+                                        </Paper>
+                                    )}
                                 </Box>
                             </Grid>
                         </Grid>
@@ -208,9 +233,7 @@
             );
         }
 
-        // Updated component to handle subtle unit labels
         function CounterInput({ label, value, onAdd, onSub }) {
-            // Function to split the label if it contains parentheses
             const renderLabel = () => {
                 const parts = label.split('(');
                 if (parts.length > 1) {
