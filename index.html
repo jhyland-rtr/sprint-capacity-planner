@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint Capacity Planner</title>
+    
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script src="https://unpkg.com/@emotion/react@11.11.4/dist/emotion-react.umd.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@emotion/styled@11.11.0/dist/emotion-styled.umd.min.js" crossorigin></script>
+    
+    <script src="https://unpkg.com/@mui/material@5.15.15/umd/material-ui.production.min.js" crossorigin></script>
+
+    <style>
+        body {
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 40px 20px;
+            font-family: 'Roboto', sans-serif;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .capacity-card {
+            background: #ffffff;
+            border-radius: 16px;
+            text-align: center;
+            padding: 32px;
+            border-top: 8px solid #1976d2;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+        .sp-value {
+            font-size: 4rem;
+            font-weight: 800;
+            color: #1976d2;
+            line-height: 1;
+            margin: 10px 0;
+        }
+        .section-box {
+            background: #ffffff;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+        .section-header-container {
+            background-color: #f1f5f9;
+            padding: 14px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+        }
+        .section-header-text {
+            font-weight: 800 !important;
+            color: #334155 !important;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            font-size: 0.85rem !important;
+        }
+        .input-content {
+            padding: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { 
+            Container, Grid, Typography, 
+            IconButton, Box, Paper, LinearProgress, Icon, CssBaseline, createTheme, ThemeProvider
+        } = MaterialUI;
+
+        const theme = createTheme({
+            palette: {
+                primary: { main: '#1976d2' },
+                secondary: { main: '#ed6c02' },
+            },
+        });
+
+        function App() {
+            const [sprintWeeks, setSprintWeeks] = React.useState(2);
+            const [devs, setDevs] = React.useState(6);
+            const [velocity, setVelocity] = React.useState(25);
+            const [leave, setLeave] = React.useState(0);
+
+            // Calculation Logic
+            const WORKING_DAYS_PER_WEEK = 5;
+            const sprintDays = sprintWeeks * WORKING_DAYS_PER_WEEK;
+            const totalPotentialDays = sprintDays * devs;
+            const actualDays = Math.max(0, totalPotentialDays - leave);
+            
+            const capacityFactor = totalPotentialDays > 0 ? actualDays / totalPotentialDays : 0;
+            const totalCapacity = Math.round(velocity * capacityFactor);
+            
+            // Apportionment Logic (Largest Remainder Method)
+            const calculateApportionment = (total, ratios) => {
+                if (total === 0) return ratios.map(() => 0);
+                let items = ratios.map((ratio, index) => {
+                    const exact = total * ratio;
+                    return {
+                        index,
+                        floor: Math.floor(exact),
+                        remainder: exact - Math.floor(exact)
+                    };
+                });
+                let currentSum = items.reduce((sum, item) => sum + item.floor, 0);
+                let missing = total - currentSum;
+                items.sort((a, b) => b.remainder - a.remainder || a.index - b.index);
+                for (let i = 0; i < missing; i++) {
+                    items[i].floor++;
+                }
+                items.sort((a, b) => a.index - b.index);
+                return items.map(item => item.floor);
+            };
+
+            const [productPoints, techPoints, bauPoints] = calculateApportionment(totalCapacity, [0.70, 0.20, 0.10]);
+
+            const adjust = (setter, current, amount) => {
+                setter(Math.max(0, current + amount));
+            };
+
+            return (
+                <ThemeProvider theme={theme}>
+                    <CssBaseline />
+                    <Container className="container">
+                        <Box sx={{ mb: 6, textAlign: 'center' }}>
+                            <Typography variant="h3" sx={{ fontWeight: 800, color: '#1e293b', mb: 1 }}>
+                                Sprint Capacity Planner
+                            </Typography>
+                        </Box>
+
+                        <Grid container spacing={4}>
+                            {/* Input Column */}
+                            <Grid item xs={12} md={6}>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    
+                                    {/* Group 1: Regular Parameters */}
+                                    <div className="section-box">
+                                        <div className="section-header-container">
+                                            <Typography className="section-header-text">Regular Sprint Parameters</Typography>
+                                        </div>
+                                        <div className="input-content">
+                                            <CounterInput 
+                                                label="Sprint Duration (Weeks)" 
+                                                value={sprintWeeks} 
+                                                onAdd={() => adjust(setSprintWeeks, sprintWeeks, 1)} 
+                                                onSub={() => adjust(setSprintWeeks, sprintWeeks, -1)} 
+                                            />
+                                            <CounterInput 
+                                                label="Team Size (Devs)" 
+                                                value={devs} 
+                                                onAdd={() => adjust(setDevs, devs, 1)} 
+                                                onSub={() => adjust(setDevs, devs, -1)} 
+                                            />
+                                            <CounterInput 
+                                                label="Avg. Full Team Velocity" 
+                                                value={velocity} 
+                                                onAdd={() => adjust(setVelocity, velocity, 1)} 
+                                                onSub={() => adjust(setVelocity, velocity, -1)} 
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Group 2: Upcoming Sprint Variable */}
+                                    <div className="section-box">
+                                        <div className="section-header-container">
+                                            <Typography className="section-header-text">Upcoming Sprint</Typography>
+                                        </div>
+                                        <div className="input-content">
+                                            <CounterInput 
+                                                label="Developer Leave (Total Days)" 
+                                                value={leave} 
+                                                onAdd={() => adjust(setLeave, leave, 1)} 
+                                                onSub={() => adjust(setLeave, leave, -1)} 
+                                            />
+                                        </div>
+                                    </div>
+                                </Box>
+                            </Grid>
+
+                            {/* Results Column */}
+                            <Grid item xs={12} md={6}>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    <div className="capacity-card">
+                                        <Typography sx={{ fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1.5 }}>
+                                            Total Sprint Capacity
+                                        </Typography>
+                                        <div className="sp-value">{totalCapacity}</div>
+                                        <Typography variant="h6" color="textSecondary">Story Points</Typography>
+                                    </div>
+
+                                    <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid #e2e8f0' }}>
+                                        <Typography variant="h6" sx={{ mb: 3, fontWeight: 700 }}>Allocation Breakdown</Typography>
+                                        
+                                        <StatBar label="Product Features" pct="70%" val={productPoints} color="#1976d2" barVal={70} />
+                                        <StatBar label="Tech Advancement" pct="20%" val={techPoints} color="#ed6c02" barVal={20} />
+                                        <StatBar label="BAU / Support" pct="10%" val={bauPoints} color="#10b981" barVal={10} />
+                                    </Paper>
+                                </Box>
+                            </Grid>
+                        </Grid>
+                    </Container>
+                </ThemeProvider>
+            );
+        }
+
+        function CounterInput({ label, value, onAdd, onSub }) {
+            return (
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography sx={{ fontWeight: 500, color: '#334155' }}>{label}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: '#f1f5f9', borderRadius: 2, p: 0.5 }}>
+                        <IconButton onClick={onSub} size="small" sx={{ color: '#64748b' }}><Icon>remove</Icon></IconButton>
+                        <Typography sx={{ width: 40, textAlign: 'center', fontWeight: 700, fontSize: '1.1rem' }}>{value}</Typography>
+                        <IconButton onClick={onAdd} size="small" sx={{ color: '#1976d2' }}><Icon>add</Icon></IconButton>
+                    </Box>
+                </Box>
+            );
+        }
+
+        function StatBar({ label, pct, val, color, barVal }) {
+            return (
+                <Box sx={{ mb: 3 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{label} <span style={{fontWeight: 400, color: '#94a3b8'}}>({pct})</span></Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{val} SP</Typography>
+                    </Box>
+                    <LinearProgress 
+                        variant="determinate" 
+                        value={barVal} 
+                        sx={{ height: 10, borderRadius: 5, bgcolor: '#f1f5f9', '& .MuiLinearProgress-bar': { bgcolor: color }}} 
+                    />
+                </Box>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
